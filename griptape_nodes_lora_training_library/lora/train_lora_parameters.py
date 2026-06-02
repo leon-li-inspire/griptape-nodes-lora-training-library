@@ -77,8 +77,18 @@ class TrainLoraParameters(ABC):
         existing_set = set(all_element_names)
 
         # Build parameter groupings, filtering to only elements that exist
-        start_params = [p for p in TrainLoraParameters.START_PARAMS if p in existing_set]
-        end_params = [p for p in TrainLoraParameters.END_PARAMS if p in existing_set]
+        start_params = []
+        for p in TrainLoraParameters.START_PARAMS:
+            if p in existing_set:
+                start_params.append(p)
+            else:
+                logger.debug(f"START_PARAMS element '{p}' not found on node, skipping")
+        end_params = []
+        for p in TrainLoraParameters.END_PARAMS:
+            if p in existing_set:
+                end_params.append(p)
+            else:
+                logger.debug(f"END_PARAMS element '{p}' not found on node, skipping")
         excluded_params = {*start_params, *end_params}
 
         # Assemble final order: start -> middle -> end

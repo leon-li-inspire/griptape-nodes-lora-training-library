@@ -5,7 +5,14 @@ import os
 from pathlib import Path
 
 import torch
-from diffusers import Flux2KleinPipeline
+
+try:
+    from diffusers import Flux2KleinPipeline
+except ImportError:
+    raise ImportError(
+        "FLUX.2 Klein training requires diffusers >= 0.38.0. "
+        "Update with: pip install 'diffusers>=0.38.0'"
+    )
 from diffusers.optimization import get_scheduler
 from peft import LoraConfig, get_peft_model
 from PIL import Image
@@ -153,6 +160,13 @@ def main():
             with torch.no_grad():
                 latent_dist = vae.encode(pixel_values).latent_dist
                 latents = latent_dist.sample()
+
+                # FLUX.2 Klein uses batch normalization instead of a scaling factor
+                bn_mean = vae.bn.running_mean.view(1, -1, 1, 1).to(latents.device, latents.dtype)
+                bn_std = torch.sqrt(vae.bn.running_var.view(1, -1, 1, 1) + vae.config.batch_norm_eps).to(
+                    latents.device, latents.dtype
+                )
+                latents = (latents - bn_mean) / bn_std
 
                 prompt_embeds, text_ids = caption_cache[caption]
                 prompt_embeds = prompt_embeds.to(device)
