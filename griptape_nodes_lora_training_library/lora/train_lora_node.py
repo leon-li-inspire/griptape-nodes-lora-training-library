@@ -103,12 +103,24 @@ class TrainLoraNode(SuccessFailureNode):
 
         raise FileNotFoundError(f"Python executable not found in expected location: {venv_python_path}")
 
+    def _resolve_script_path(self, script_name: str) -> Path:
+        """Resolve training script path, checking library root then sd-scripts."""
+        library_root = Path(__file__).parent.parent
+        # Check library root first (for diffusers-based scripts like FLUX.2 Klein)
+        script_path = library_root / script_name
+        if script_path.exists():
+            return script_path
+        # Fall back to sd-scripts directory (for kohya sd-scripts)
+        script_path = library_root / "sd-scripts" / script_name
+        if script_path.exists():
+            return script_path
+        raise FileNotFoundError(
+            f"Script '{script_name}' not found in {library_root} or {library_root / 'sd-scripts'}"
+        )
+
     def _generate_command(self, library_env_python: Path) -> list[str]:
         script_name = self.params.model_family_parameters.get_script_name()
-        sd_scripts_dir = Path(__file__).parent.parent / "sd-scripts"
-        script_path = sd_scripts_dir / script_name
-        if not script_path.exists():
-            raise FileNotFoundError(f"Script not found: {script_path}")
+        script_path = self._resolve_script_path(script_name)
         command = [
             str(library_env_python),
             "-u",
