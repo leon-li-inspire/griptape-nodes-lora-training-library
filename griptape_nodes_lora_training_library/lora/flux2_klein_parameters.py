@@ -28,17 +28,18 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
             ],
             parameter_name="flux2_klein_model",
         )
-        self._dataset_path = Parameter(
-            name="dataset_path",
+        self._dataset_config = Parameter(
+            name="dataset_config_path",
             allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
             type="str",
             default_value="",
-            tooltip="Path to directory containing training images and .txt caption files.",
+            tooltip="The full path to the dataset configuration file (.toml) or image directory.",
             traits={
                 FileSystemPicker(
-                    allow_files=False,
+                    allow_files=True,
                     allow_directories=True,
                     multiple=False,
+                    file_types=[".toml"],
                 )
             },
         )
@@ -141,7 +142,7 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
 
     def add_input_parameters(self) -> None:
         self._model_repo_parameter.add_input_parameters()
-        self._node.add_parameter(self._dataset_path)
+        self._node.add_parameter(self._dataset_config)
         self._node.add_parameter(self._output_dir)
         self._node.add_parameter(self._output_name)
         self._node.add_parameter(self._learning_rate)
@@ -158,7 +159,7 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
 
     def remove_input_parameters(self) -> None:
         self._model_repo_parameter.remove_input_parameters()
-        self._node.remove_parameter_element_by_name(self._dataset_path.name)
+        self._node.remove_parameter_element_by_name(self._dataset_config.name)
         self._node.remove_parameter_element_by_name(self._output_dir.name)
         self._node.remove_parameter_element_by_name(self._output_name.name)
         self._node.remove_parameter_element_by_name(self._learning_rate.name)
@@ -179,6 +180,26 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
     def preprocess(self) -> None:
         self._seed_parameter.preprocess()
 
+    def _resolve_dataset_path(self) -> str:
+        """Resolve the image directory from dataset_config_path.
+
+        If the path is a .toml file, parse it to extract image_dir.
+        If it's a directory, use it directly.
+        """
+        import tomllib
+
+        config_path = Path(self._node.get_parameter_value("dataset_config_path"))
+        if config_path.suffix == ".toml" and config_path.is_file():
+            with open(config_path, "rb") as f:
+                config = tomllib.load(f)
+            datasets = config.get("datasets", [])
+            if datasets:
+                subsets = datasets[0].get("subsets", [])
+                if subsets:
+                    return subsets[0].get("image_dir", str(config_path.parent))
+            return str(config_path.parent)
+        return str(config_path)
+
     def get_script_params(self) -> list[str]:
         repo_id, _revision = self._model_repo_parameter.get_repo_revision()
 
@@ -186,7 +207,7 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
             "--pretrained_model_name_or_path",
             repo_id,
             "--dataset_path",
-            self._node.get_parameter_value("dataset_path"),
+            self._resolve_dataset_path(),
             "--output_dir",
             self._node.get_parameter_value("output_dir"),
             "--output_name",
