@@ -5,14 +5,7 @@ import os
 from pathlib import Path
 
 import torch
-
-try:
-    from diffusers import Flux2KleinPipeline
-except ImportError:
-    raise ImportError(
-        "FLUX.2 Klein training requires diffusers >= 0.38.0. "
-        "Update with: pip install 'diffusers>=0.38.0'"
-    )
+from diffusers import Flux2KleinPipeline
 from diffusers.optimization import get_scheduler
 from peft import LoraConfig, get_peft_model
 from PIL import Image
