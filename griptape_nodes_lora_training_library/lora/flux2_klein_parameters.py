@@ -123,13 +123,6 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
                 Options(choices=["bf16", "no"]),
             },
         )
-        self._gradient_checkpointing = Parameter(
-            name="gradient_checkpointing",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
-            type="bool",
-            default_value=True,
-            tooltip="Enable gradient checkpointing to reduce VRAM usage.",
-        )
         self._max_grad_norm = Parameter(
             name="max_grad_norm",
             allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
@@ -153,7 +146,6 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
         self._node.add_parameter(self._num_repeats)
         self._node.add_parameter(self._resolution)
         self._node.add_parameter(self._mixed_precision)
-        self._node.add_parameter(self._gradient_checkpointing)
         self._node.add_parameter(self._max_grad_norm)
         self._seed_parameter.add_input_parameters()
 
@@ -170,7 +162,6 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
         self._node.remove_parameter_element_by_name(self._num_repeats.name)
         self._node.remove_parameter_element_by_name(self._resolution.name)
         self._node.remove_parameter_element_by_name(self._mixed_precision.name)
-        self._node.remove_parameter_element_by_name(self._gradient_checkpointing.name)
         self._node.remove_parameter_element_by_name(self._max_grad_norm.name)
         self._seed_parameter.remove_input_parameters()
 
@@ -233,9 +224,6 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
             "--max_grad_norm",
             str(float(self._node.get_parameter_value("max_grad_norm"))),
         ]
-
-        if self._node.get_parameter_value("gradient_checkpointing"):
-            params.append("--gradient_checkpointing")
 
         return params
 

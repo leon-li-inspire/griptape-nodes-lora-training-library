@@ -73,7 +73,6 @@ def parse_args():
     parser.add_argument("--save_every_n_steps", type=int, default=500)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--mixed_precision", type=str, default="bf16", choices=["bf16", "no"])
-    parser.add_argument("--gradient_checkpointing", action="store_true", default=True)
     parser.add_argument("--max_grad_norm", type=float, default=1.0)
     return parser.parse_args()
 
@@ -97,8 +96,7 @@ def main():
     vae = pipe.vae.to(device)
     transformer = pipe.transformer.to(device)
 
-    if args.gradient_checkpointing:
-        transformer.enable_gradient_checkpointing()
+    transformer.enable_gradient_checkpointing()
 
     print("Pre-encoding captions...")
     pipe.text_encoder.to(device)
