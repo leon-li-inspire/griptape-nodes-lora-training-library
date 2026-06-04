@@ -189,7 +189,7 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
         return str(config_path)
 
     def get_script_params(self) -> list[str]:
-        repo_id, _revision = self._model_repo_parameter.get_repo_revision()
+        repo_id = self._node.get_parameter_value("flux2_klein_model")
 
         params = [
             "--pretrained_model_name_or_path",
