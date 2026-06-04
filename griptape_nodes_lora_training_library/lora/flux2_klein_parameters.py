@@ -30,7 +30,7 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
         )
         self._dataset_config = Parameter(
             name="dataset_config_path",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
+            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY, ParameterMode.OUTPUT},
             type="str",
             default_value="",
             tooltip="The full path to the dataset configuration file (.toml) or image directory.",
@@ -66,56 +66,56 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
         )
         self._learning_rate = Parameter(
             name="learning_rate",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
+            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY, ParameterMode.OUTPUT},
             type="float",
             default_value=1e-4,
             tooltip="The learning rate for training.",
         )
         self._max_train_steps = Parameter(
             name="max_train_steps",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
+            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY, ParameterMode.OUTPUT},
             type="int",
             default_value=1500,
             tooltip="Maximum number of training steps.",
         )
         self._save_every_n_steps = Parameter(
             name="save_every_n_steps",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
+            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY, ParameterMode.OUTPUT},
             type="int",
             default_value=500,
             tooltip="Save a checkpoint every N steps (0 to disable).",
         )
         self._network_dim = Parameter(
             name="network_dim",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
+            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY, ParameterMode.OUTPUT},
             type="int",
             default_value=16,
             tooltip="The dimension of the LoRA network (rank).",
         )
         self._network_alpha = Parameter(
             name="network_alpha",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
+            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY, ParameterMode.OUTPUT},
             type="int",
             default_value=16,
             tooltip="The alpha parameter for the LoRA network.",
         )
         self._num_repeats = Parameter(
             name="num_repeats",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
+            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY, ParameterMode.OUTPUT},
             type="int",
             default_value=10,
             tooltip="Number of times to repeat the dataset per epoch.",
         )
         self._resolution = Parameter(
             name="resolution",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
+            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY, ParameterMode.OUTPUT},
             type="int",
             default_value=512,
             tooltip="Training resolution (images will be resized and center-cropped).",
         )
         self._mixed_precision = Parameter(
             name="mixed_precision",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
+            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY, ParameterMode.OUTPUT},
             type="str",
             default_value="bf16",
             tooltip="Mixed precision training mode",
@@ -125,7 +125,7 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
         )
         self._max_grad_norm = Parameter(
             name="max_grad_norm",
-            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY},
+            allowed_modes={ParameterMode.INPUT, ParameterMode.PROPERTY, ParameterMode.OUTPUT},
             type="float",
             default_value=1.0,
             tooltip="Maximum gradient norm for clipping.",
@@ -177,17 +177,14 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
         If the path is a .toml file, parse it to extract image_dir.
         If it's a directory, use it directly.
         """
-        import tomllib
+        import re
 
         config_path = Path(self._node.get_parameter_value("dataset_config_path"))
         if config_path.suffix == ".toml" and config_path.is_file():
-            with open(config_path, "rb") as f:
-                config = tomllib.load(f)
-            datasets = config.get("datasets", [])
-            if datasets:
-                subsets = datasets[0].get("subsets", [])
-                if subsets:
-                    return subsets[0].get("image_dir", str(config_path.parent))
+            content = config_path.read_text()
+            match = re.search(r"image_dir\s*=\s*['\"](.+?)['\"]", content)
+            if match:
+                return match.group(1)
             return str(config_path.parent)
         return str(config_path)
 

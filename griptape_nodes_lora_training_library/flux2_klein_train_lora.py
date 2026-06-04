@@ -134,6 +134,16 @@ def main():
         num_training_steps=args.max_train_steps,
     )
 
+    def convert_peft_to_diffusers(state_dict):
+        """Convert PEFT LoRA keys to diffusers-compatible format."""
+        converted = {}
+        for k, v in state_dict.items():
+            new_key = k.replace("base_model.model.", "transformer.")
+            new_key = new_key.replace(".lora_A.default.weight", ".lora_A.weight")
+            new_key = new_key.replace(".lora_B.default.weight", ".lora_B.weight")
+            converted[new_key] = v
+        return converted
+
     os.makedirs(args.output_dir, exist_ok=True)
     global_step = 0
     progress_bar = tqdm(total=args.max_train_steps, desc="Training")
@@ -215,14 +225,16 @@ def main():
 
             if args.save_every_n_steps > 0 and global_step % args.save_every_n_steps == 0:
                 save_path = Path(args.output_dir) / f"{args.output_name}-step{global_step}.safetensors"
-                lora_state_dict = {k: v for k, v in transformer.state_dict().items() if "lora" in k.lower()}
-                save_file(lora_state_dict, str(save_path))
+                ckpt_state_dict = {k: v for k, v in transformer.state_dict().items() if "lora" in k.lower()}
+                ckpt_state_dict = convert_peft_to_diffusers(ckpt_state_dict)
+                save_file(ckpt_state_dict, str(save_path))
                 print(f"\nCheckpoint: {save_path}")
 
     progress_bar.close()
 
     final_path = Path(args.output_dir) / f"{args.output_name}.safetensors"
     lora_state_dict = {k: v for k, v in transformer.state_dict().items() if "lora" in k.lower()}
+    lora_state_dict = convert_peft_to_diffusers(lora_state_dict)
     metadata = {
         "model_version": repo_id,
         "network_dim": str(args.network_dim),
