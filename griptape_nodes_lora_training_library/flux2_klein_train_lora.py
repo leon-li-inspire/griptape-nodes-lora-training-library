@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """FLUX.2 Klein LoRA training script using diffusers + PEFT."""
 import argparse
+import gc
 import os
 from pathlib import Path
 
@@ -84,15 +85,11 @@ def main():
     print(f"Using device: {device}")
 
     print(f"Loading pipeline from {repo_id}...")
-    pipe = Flux2KleinPipeline.from_pretrained(repo_id, torch_dtype=dtype)
-
-    vae = pipe.vae.to(device)
-    transformer = pipe.transformer.to(device)
-
-    transformer.enable_gradient_checkpointing()
+    pipe = Flux2KleinPipeline.from_pretrained(
+        repo_id, torch_dtype=dtype, device_map="balanced"
+    )
 
     print("Pre-encoding captions...")
-    pipe.text_encoder.to(device)
     dataset = ImageCaptionDataset(args.dataset_path, resolution=args.resolution, num_repeats=args.num_repeats)
 
     caption_cache = {}
@@ -109,7 +106,12 @@ def main():
     del pipe.text_encoder
     if device == "cuda":
         torch.cuda.empty_cache()
+    gc.collect()
     print(f"Cached {len(caption_cache)} unique captions")
+
+    vae = pipe.vae.to(device)
+    transformer = pipe.transformer.to(device)
+    transformer.enable_gradient_checkpointing()
 
     print("Applying LoRA to transformer...")
     lora_config = LoraConfig(
@@ -162,13 +164,6 @@ def main():
                 latent_dist = vae.encode(pixel_values).latent_dist
                 latents = latent_dist.sample()
 
-                # FLUX.2 Klein uses batch normalization instead of a scaling factor
-                bn_mean = vae.bn.running_mean.view(1, -1, 1, 1).to(latents.device, latents.dtype)
-                bn_std = torch.sqrt(vae.bn.running_var.view(1, -1, 1, 1) + vae.config.batch_norm_eps).to(
-                    latents.device, latents.dtype
-                )
-                latents = (latents - bn_mean) / bn_std
-
                 prompt_embeds, text_ids = caption_cache[caption]
                 prompt_embeds = prompt_embeds.to(device)
                 text_ids = text_ids.to(device)
@@ -179,6 +174,15 @@ def main():
             latents_packed = latents.view(bsz, c, h // 2, 2, w // 2, 2)
             latents_packed = latents_packed.permute(0, 1, 3, 5, 2, 4)
             latents_packed = latents_packed.reshape(bsz, c * 4, h // 2, w // 2)
+
+            # Batch normalization operates on packed latents (c*4=128 channels)
+            with torch.no_grad():
+                bn_mean = vae.bn.running_mean.view(1, -1, 1, 1).to(latents_packed.device, latents_packed.dtype)
+                bn_std = torch.sqrt(vae.bn.running_var.view(1, -1, 1, 1) + vae.config.batch_norm_eps).to(
+                    latents_packed.device, latents_packed.dtype
+                )
+                latents_packed = (latents_packed - bn_mean) / bn_std
+
             latents_flat = latents_packed.permute(0, 2, 3, 1).reshape(bsz, (h // 2) * (w // 2), c * 4)
 
             # U-shaped timestep distribution
