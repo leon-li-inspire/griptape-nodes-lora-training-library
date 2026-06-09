@@ -18,6 +18,8 @@ logger = logging.getLogger("griptape_nodes_lora_training_library")
 
 
 class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
+    PARAM_MODEL = "flux2_klein_model"
+
     def __init__(self, node: TrainLoraNode):
         self._node = node
         self._model_repo_parameter = HuggingFaceRepoParameter(
@@ -26,7 +28,7 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
                 "black-forest-labs/FLUX.2-klein-base-4B",
                 "black-forest-labs/FLUX.2-klein-4B",
             ],
-            parameter_name="flux2_klein_model",
+            parameter_name=self.PARAM_MODEL,
         )
         self._dataset_config = Parameter(
             name="dataset_config_path",
@@ -189,7 +191,7 @@ class FLUX2KleinParameters(TrainLoraModelFamilyParameters):
         return str(config_path)
 
     def get_script_params(self) -> list[str]:
-        repo_id = self._node.get_parameter_value("flux2_klein_model")
+        repo_id = self._node.get_parameter_value(self.PARAM_MODEL)
 
         params = [
             "--pretrained_model_name_or_path",

@@ -91,27 +91,26 @@ class TrainLoraNode(SuccessFailureNode):
 
     def _get_library_env_python(self) -> Path:
         import subprocess
-        import sys
 
-        # Following pattern from Library Manager
         venv_path = Path(__file__).parent.parent / ".venv"
         if GriptapeNodes.OSManager().is_windows():
             venv_python_path = venv_path / "Scripts" / "python.exe"
         else:
             venv_python_path = venv_path / "bin" / "python"
 
-        if venv_python_path.exists():
-            # Verify the venv has required modules (accelerate)
-            result = subprocess.run(
-                [str(venv_python_path), "-c", "import accelerate"],
-                capture_output=True,
-            )
-            if result.returncode == 0:
-                logger.debug(f"Python executable found at: {venv_python_path}")
-                return venv_python_path
-            logger.debug(f"Library venv missing deps, falling back to sys.executable")
+        if not venv_python_path.exists():
+            msg = f"Library venv not found at {venv_path}. Please reinstall the LoRA training library."
+            raise FileNotFoundError(msg)
 
-        return Path(sys.executable)
+        result = subprocess.run(
+            [str(venv_python_path), "-c", "import accelerate"],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            msg = f"Library venv at {venv_path} is missing required dependencies. Please reinstall the LoRA training library."
+            raise RuntimeError(msg)
+
+        return venv_python_path
 
     def _resolve_script_path(self, script_name: str) -> Path:
         """Resolve training script path, checking library root then sd-scripts."""
