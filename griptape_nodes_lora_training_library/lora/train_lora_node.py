@@ -91,7 +91,6 @@ class TrainLoraNode(SuccessFailureNode):
 
     def _get_library_env_python(self) -> Path:
         import subprocess
-        import sys
 
         venv_path = Path(__file__).parent.parent / ".venv"
         if GriptapeNodes.OSManager().is_windows():
@@ -100,31 +99,18 @@ class TrainLoraNode(SuccessFailureNode):
             venv_python_path = venv_path / "bin" / "python"
 
         if not venv_python_path.exists():
-            return self._fallback_to_sys_executable(venv_path)
+            msg = f"Library venv not found at {venv_path}. Please reinstall the LoRA training library."
+            raise FileNotFoundError(msg)
 
         result = subprocess.run(
             [str(venv_python_path), "-c", "import accelerate"],
             capture_output=True,
         )
         if result.returncode != 0:
-            return self._fallback_to_sys_executable(venv_path)
+            msg = f"Library venv at {venv_path} is missing required dependencies. Please reinstall the LoRA training library."
+            raise RuntimeError(msg)
 
         return venv_python_path
-
-    @staticmethod
-    def _fallback_to_sys_executable(venv_path: Path) -> Path:
-        """Fall back to sys.executable only if it has the required deps (e.g. Deadline Cloud worker)."""
-        import subprocess
-        import sys
-
-        result = subprocess.run(
-            [sys.executable, "-c", "import accelerate"],
-            capture_output=True,
-        )
-        if result.returncode == 0:
-            return Path(sys.executable)
-        msg = f"Library venv at {venv_path} is missing required dependencies and the current Python environment does not have them either. Please reinstall the LoRA training library."
-        raise RuntimeError(msg)
 
     def _resolve_script_path(self, script_name: str) -> Path:
         """Resolve training script path, checking library root then sd-scripts."""
